@@ -89,7 +89,7 @@ const server=createServer(async(req,res)=>{
     }
     if(req.method!=='GET'&&req.method!=='HEAD')throw new BillingError('请求方法不支持',405);
     const relative=decodeURIComponent(path).replace(/^\//,'')||'index.html';
-    const allowed=new Set(['index.html','app.js','engine.js','style.css','limits.js','billing.js','analysis-worker.js']);
+    const allowed=new Set(['index.html','app.js','engine.js','style.css','limits.js','billing.js','access.js','analysis-worker.js']);
     if(!allowed.has(relative)&&!relative.startsWith('vendor/'))throw new BillingError('页面不存在',404);
     const file=resolve(root,relative);if(!file.startsWith(root+'/'))throw new BillingError('页面不存在',404);
     const data=await readFile(file);const types={'.html':'text/html; charset=utf-8','.js':'application/javascript','.css':'text/css','.wasm':'application/wasm','.gz':'application/gzip'};

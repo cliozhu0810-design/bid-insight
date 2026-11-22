@@ -4,7 +4,7 @@
   let account=null,pendingConsent=null,orderId=sessionStorage.getItem('bid.pendingOrder')||'',working=false;
   async function api(path,options={}){const r=await fetch('/api/'+path,{credentials:'same-origin',...options,headers:{'Content-Type':'application/json',...options.headers},signal:AbortSignal.timeout(150000)});const d=await r.json();if(!r.ok){const e=Error(d.error||'服务暂不可用');e.status=r.status;throw e}return d}
   function notice(text){message.textContent=text}
-  function update(){const state=document.getElementById('billing-state');state.textContent=!live?'筹备中 · 当前免费体验':!account?'微信登录后可用':account.trialRemaining?'剩余免费试用 1 次':`可用付费次数 ${account.credits} 次`;document.getElementById('billing-open').textContent=live?'我的试用与次数':'查看收费规则'}
+  function update(){const state=document.getElementById('billing-state');state.textContent=!live?'当前免费体验 · 收费尚未开通':!account?'微信登录后可用':account.trialRemaining?'剩余免费试用 1 次':`可用付费次数 ${account.credits} 次`;document.getElementById('billing-open').textContent=live?'我的次数':'收费说明'}
   async function refresh(){if(live){try{account=await api('account')}catch(e){if(e.status===401)account=null;else throw e}}update();return account}
   function show(){if(!modal.open)modal.showModal();check.hidden=true;action.hidden=false;action.disabled=false;
     if(!live){notice('收费功能尚未开通，当前网页仍可免费体验，不会扣款，也不会消耗未来的正式免费试用次数。');action.hidden=true;return}
@@ -30,6 +30,6 @@
     async beforeAnalysis(demo){if(!live||demo)return true;if(pendingConsent)return false;try{await refresh()}catch(e){show();notice(e.message);return false}return new Promise(resolve=>{pendingConsent=resolve;show()})},
     async analyze(payload){const encoded=JSON.stringify(payload);const digest=[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(encoded)))].map(n=>n.toString(16).padStart(2,'0')).join('');const result=await api('analysis',{method:'POST',body:JSON.stringify({...payload,requestId:digest})});account=result.account;update();return result.pairs}
   };
-  if(live){document.querySelector('.secure').textContent='◈ 原始标书留在本机';document.querySelector('.aside-bottom p').textContent='正式分析会提交提取文字及图片指纹。分析内容不写入计费数据库。';document.getElementById('billing-stage').textContent='每个微信账号免费试用 1 次，之后 ¥5 / 次'}
+  if(live){document.getElementById('privacy-note').textContent='原始文件留在本机 · 分析时提交提取内容';document.getElementById('entry-privacy').textContent='原始文件及图片留在本机。正式分析会在另行确认后提交提取文字、字段与图片指纹到服务端，不写入计费数据库。请仅使用你有权处理的文件。'}
   update();
 })();
