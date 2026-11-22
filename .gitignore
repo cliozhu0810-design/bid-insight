@@ -8,3 +8,6 @@ server/data/
 node_modules/
 
 wechat/project.private.config.json
+
+/output/
+/tmp/
