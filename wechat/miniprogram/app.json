@@ -1,1 +1,22 @@
-{"pages":["pages/home/home","pages/analysis/analysis"],"window":{"navigationBarTitleText":"标鉴","navigationBarBackgroundColor":"#f4f7f6","navigationBarTextStyle":"black","backgroundColor":"#f4f7f6"},"style":"v2","sitemapLocation":"sitemap.json"}
+{
+  "pages": [
+    "pages/home/home"
+  ],
+  "subpackages": [
+    {
+      "root": "analysis",
+      "pages": [
+        "index"
+      ]
+    }
+  ],
+  "window": {
+    "navigationBarTitleText": "标鉴",
+    "navigationBarBackgroundColor": "#f4f7f6",
+    "navigationBarTextStyle": "black",
+    "backgroundColor": "#f4f7f6"
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json",
+  "lazyCodeLoading": "requiredComponents"
+}

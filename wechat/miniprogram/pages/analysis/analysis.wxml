@@ -1,1 +1,0 @@
-<web-view wx:if="{{src}}" src="{{src}}" binderror="failed"></web-view><view wx:else class="card"><view class="title">暂时无法打开</view><view class="muted">请检查网络后重新进入。如仍无法打开，请联系服务提供方。</view><button bindtap="back">返回首页</button></view>

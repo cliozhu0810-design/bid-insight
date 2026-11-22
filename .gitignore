@@ -6,3 +6,5 @@ server/data/
 *.pem
 *.key
 node_modules/
+
+wechat/project.private.config.json
