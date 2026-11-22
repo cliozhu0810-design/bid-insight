@@ -1,0 +1,1 @@
+{"desc":"仅索引首页，不索引用户分析页","rules":[{"action":"allow","page":"pages/home/home"},{"action":"disallow","page":"*"}]}

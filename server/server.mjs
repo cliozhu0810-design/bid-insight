@@ -25,6 +25,7 @@ function validatePayload(p){
   if(!p||!Array.isArray(p.docs)||p.docs.length<2||p.docs.length>5)throw new BillingError('每次需要 2 至 5 份标书',400);
   if(typeof p.requestId!=='string'||!/^[-\w]{16,80}$/.test(p.requestId))throw new BillingError('请求编号无效',400);
   if(typeof p.baseline!=='string'||p.baseline.length>2000000||!Array.isArray(p.ignores)||p.ignores.length>1000||p.ignores.some(x=>typeof x!=='string'||x.length>1000))throw new BillingError('排除项格式无效',400);
+  if(p.options!==undefined&&(!p.options||typeof p.options.templateSaver!=='string'||p.options.templateSaver.length>500))throw new BillingError('原文件保存者格式无效',400);
   const ids=new Set();let textSize=0;
   for(const d of p.docs){
     if(!Number.isSafeInteger(d.id)||ids.has(d.id)||typeof d.company!=='string'||d.company.length>500||!Array.isArray(d.pages)||d.pages.length<1||d.pages.length>1000||!Array.isArray(d.fields)||d.fields.length>20000||!Array.isArray(d.images)||d.images.length>10000)throw new BillingError('分析材料格式无效',400);
@@ -81,7 +82,7 @@ const server=createServer(async(req,res)=>{
         if(activeJobs>=2)throw new BillingError('分析任务繁忙，请稍后重试；次数未扣除',503);
         const p=JSON.parse(await body(req));validatePayload(p);
         if(activeJobs>=2)throw new BillingError('分析任务繁忙，请稍后重试；次数未扣除',503);
-        const batchHash=hash(JSON.stringify({docs:p.docs,baseline:p.baseline,ignores:p.ignores}));const reservation=ledger.begin(id,p.requestId,batchHash);activeJobs++;
+        const batchHash=hash(JSON.stringify({docs:p.docs,baseline:p.baseline,ignores:p.ignores,options:p.options}));const reservation=ledger.begin(id,p.requestId,batchHash);activeJobs++;
         try{const pairs=await compare(p);if(!reservation.replay)ledger.finish(id,p.requestId);return send(res,200,{pairs,account:ledger.account(id),replay:reservation.replay})}
         catch(e){if(!reservation.replay)ledger.fail(id,p.requestId);throw e}finally{activeJobs--}
       }
@@ -89,7 +90,7 @@ const server=createServer(async(req,res)=>{
     }
     if(req.method!=='GET'&&req.method!=='HEAD')throw new BillingError('请求方法不支持',405);
     const relative=decodeURIComponent(path).replace(/^\//,'')||'index.html';
-    const allowed=new Set(['index.html','app.js','engine.js','style.css','limits.js','billing.js','access.js','analysis-worker.js']);
+    const allowed=new Set(['index.html','app.js','engine.js','docx-metadata.js','style.css','limits.js','billing.js','access.js','analysis-worker.js']);
     if(!allowed.has(relative)&&!relative.startsWith('vendor/'))throw new BillingError('页面不存在',404);
     const file=resolve(root,relative);if(!file.startsWith(root+'/'))throw new BillingError('页面不存在',404);
     const data=await readFile(file);const types={'.html':'text/html; charset=utf-8','.js':'application/javascript','.css':'text/css','.wasm':'application/wasm','.gz':'application/gzip'};

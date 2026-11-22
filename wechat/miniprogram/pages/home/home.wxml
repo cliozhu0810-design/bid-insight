@@ -1,0 +1,1 @@
+<view class="card"><view class="title">标鉴</view><view>标书关联线索分析 · 免费版</view><view class="muted">比对企业、人员、文字、图片与报价，保留原文位置供核查。</view><view class="muted">结果仅供参考，不作围标或违法认定。进入后请先阅读并确认免责声明。</view><view wx:if="{{error}}" class="error" role="alert">{{error}}</view><button class="primary" bindtap="start">开始使用</button></view>

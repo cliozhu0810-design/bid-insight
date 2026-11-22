@@ -1,0 +1,9 @@
+{
+  "description": "标鉴免费版，企业小程序开发工程",
+  "miniprogramRoot": "miniprogram/",
+  "compileType": "miniprogram",
+  "appid": "touristappid",
+  "projectname": "bid-insight-free",
+  "setting": {"urlCheck": true, "es6": true, "minified": true},
+  "condition": {}
+}

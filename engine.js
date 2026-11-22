@@ -19,7 +19,30 @@ function exactRepeats(ap,bp,ignored){
  return out;
 }
 function referenceSummary(pair){const es=pair.evidence.filter(e=>e.active),anomalies=new Set(es.filter(e=>e.kind==='error').map(e=>e.title)),images=new Set(es.filter(e=>e.kind==='image').map(e=>e.a.hash));return {continuous:es.filter(e=>e.category==='连续重复').length,commonCandidates:anomalies.size+images.size,crossNames:es.filter(e=>e.category==='公司名称交叉出现').length}}
-function compare(a,b,baseline='',ignore=[]){const bn=norm(baseline),ignored=x=>ignore.some(t=>norm(x).includes(norm(t)))||(bn&&bn.includes(norm(x)));let ev=[];const duplicate=(a.digest&&a.digest===b.digest)||norm(a.company)===norm(b.company);
+function prices(pages){const rows=[];
+ // Conservative labelled prices. Ambiguous multi-number rows and unlabelled table cells are skipped.
+ for(const p of pages)for(const line of p.text.split(/\n/)){
+ const m=line.trim().match(/^(.{2,80}?)(单价|总价|报价|金额)\s*[:：=]?\s*(?:人民币\s*)?([¥￥])?\s*([0-9]+(?:,[0-9]{3})*(?:\.[0-9]{1,4})?)\s*(万元|元)(?:\s*[/／]\s*([^\s，。；;]{1,12}))?\s*[，。；;]?$/);
+ if(!m)continue;const label=m[1].replace(/^\s*\d+[、.．)）]\s*/, '').trim(),value=Number(m[4].replace(/,/g,''))*(m[5]==='万元'?10000:1);
+ if(!value||!Number.isFinite(value))continue;rows.push({key:norm(label)+':'+m[2]+':'+(m[6]||''),value,page:p.no,source:line.trim(),label:label+m[2]});
+ }return rows;
+}
+function priceEvidence(a,b,ignored){const aa=prices(a.pages),bb=prices(b.pages),matches=[];
+ for(const x of aa){if(ignored(x.source)||aa.filter(t=>t.key===x.key).length!==1)continue;const hits=bb.filter(y=>y.key===x.key&&!ignored(y.source));if(hits.length===1)matches.push({a:x,b:hits[0]})}
+ if(matches.length<3)return [];
+ const close=(x,y,tol)=>Math.abs(x-y)<=tol,delta=matches[0].b.value-matches[0].a.value,ratio=matches[0].b.value/matches[0].a.value;
+ let title='';if(matches.every(x=>close(x.a.value,x.b.value,.005)))title='多项报价一致';
+ else if(matches.every(x=>close(x.b.value-x.a.value,delta,.01)))title='报价固定差额：B − A = '+delta.toFixed(2)+' 元';
+ else if(matches.every(x=>close(x.b.value,x.a.value*ratio,Math.max(.01,Math.abs(x.b.value)*.0001))))title='报价固定比例：B / A ≈ '+ratio.toFixed(6);
+ if(!title)return [];
+ return [{kind:'price',category:'报价规律',title:title+'（'+matches.length+' 项同名同口径候选，待核查）',weight:0,a:matches[0].a,b:matches[0].b,rows:matches,active:true}];
+}
+function genericSaver(s){const n=norm(s);return !n||/^(administer|administrator|admin|user\d*|default|owner|test|unknown|wps|microsoft|用户|管理员|使用者|作者|默认用户|电脑用户|无|未知|abc|testuser)$/.test(n)||/^\d+$/.test(n)||/^(.)\1+$/.test(n)}
+function saverEvidence(a,b,options){const av=a.metadata?.lastSavedBy||'',bv=b.metadata?.lastSavedBy||'';
+ if(genericSaver(av)||norm(av)!==norm(bv)||norm(av)===norm(options.templateSaver||''))return [];
+ return [{kind:'meta',category:'最后保存者',title:'最后保存者相同：'+av+'（文件属性，可修改，待核查）',weight:0,a:{page:'文件属性（无页码）',source:(a.metadata.lastSavedSource||'最后保存者')+'：'+av},b:{page:'文件属性（无页码）',source:(b.metadata.lastSavedSource||'最后保存者')+'：'+bv},active:true}];
+}
+function compare(a,b,baseline='',ignore=[],options={}){const bn=norm(baseline),ignored=x=>ignore.some(t=>norm(x).includes(norm(t)))||(bn&&bn.includes(norm(x)));let ev=[...saverEvidence(a,b,options),...priceEvidence(a,b,ignored)];const duplicate=(a.digest&&a.digest===b.digest)||norm(a.company)===norm(b.company);
 for(const fa of a.fields.filter(f=>!f.excluded&&!ignored(f.value))){const fb=b.fields.find(f=>f.key===fa.key&&!f.excluded);if(fb)ev.push({kind:'entity',category:fa.type,title:fa.type+'相同：'+fa.value,weight:fa.weight,a:fa,b:fb,active:true})}
 ev.push(...exactRepeats(a.pages,b.pages,ignored));
 for(const [source,target,reverse] of [[a,b,false],[b,a,true]]){if(!duplicate&&target.company&&norm(target.company).length>=4&&!ignored(target.company)){const page=source.pages.find(p=>norm(p.text).includes(norm(target.company)));if(page){const entry={page:page.no,source:page.text.slice(Math.max(0,page.text.indexOf(target.company)-40),Math.max(0,page.text.indexOf(target.company))+target.company.length+100)},owner={page:'企业信息',source:target.company};ev.push({kind:'meta',category:'公司名称交叉出现',title:'出现另一投标人名称：'+target.company+'（核查是否误写，不计分）',weight:0,a:reverse?owner:entry,b:reverse?entry:owner,active:true})}}}
@@ -33,5 +56,5 @@ for(const ia of a.images){let best=null,v=0;for(const ib of b.images){if(Math.ab
 return {a:a.id,b:b.id,duplicate,evidence:ev.slice(0,80)};
 }
 function score(pair){if(pair.duplicate)return null;const es=pair.evidence.filter(e=>e.active);let types=new Map;es.filter(e=>e.kind==='entity').forEach(e=>types.set(e.category,e.weight));return Math.min(70,[...types.values()].reduce((a,b)=>a+b,0))+Math.min(15,es.filter(e=>e.kind==='text').reduce((s,e)=>s+e.weight,0))+Math.min(10,es.filter(e=>e.kind==='image').reduce((s,e)=>s+e.weight,0))+Math.min(5,es.filter(e=>e.kind==='error').reduce((s,e)=>s+e.weight,0))}
-root.BidEngine={norm,extract,company,compare,score,hashSimilarity,referenceSummary};if(typeof module!=='undefined')module.exports=root.BidEngine;
+root.BidEngine={norm,extract,company,compare,score,hashSimilarity,referenceSummary,prices,genericSaver};if(typeof module!=='undefined')module.exports=root.BidEngine;
 })(typeof window==='undefined'?globalThis:window);

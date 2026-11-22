@@ -1,10 +1,10 @@
-importScripts('engine.js?v=20261122-5');
+importScripts('engine.js?v=20261122-6');
 self.onmessage=({data})=>{
   try {
     const pairs=[];
     for(let i=0;i<data.docs.length;i++)for(let j=i+1;j<data.docs.length;j++){
       self.postMessage({type:'progress',message:`正在比较第 ${i+1} 与第 ${j+1} 份标书…`});
-      pairs.push(BidEngine.compare(data.docs[i],data.docs[j],data.baseline,data.ignores));
+      pairs.push(BidEngine.compare(data.docs[i],data.docs[j],data.baseline,data.ignores,data.options));
     }
     self.postMessage({type:'done',pairs});
   } catch(error){ self.postMessage({type:'error',message:error.message}); }
