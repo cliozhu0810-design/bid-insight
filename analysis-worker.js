@@ -1,4 +1,4 @@
-importScripts('engine.js');
+importScripts('engine.js?v=20261122-5');
 self.onmessage=({data})=>{
   try {
     const pairs=[];
