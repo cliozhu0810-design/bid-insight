@@ -65,16 +65,20 @@ function getDoc(id){return docs.find(d=>d.id===id)}
 function quote(x,d){return `<div class="quote"><small>${esc(d.company)} · ${d.unit} ${x.page}</small>${x.src?`<img src="${x.src}" alt="来源图片，${esc(d.unit)} ${x.page}">`:''}${esc(x.source)}</div>`}
 function results(){const scores=pairs.map(E.score).filter(s=>s!==null),evidenceCount=pairs.reduce((s,p)=>s+p.evidence.filter(e=>e.active).length,0);$('results').hidden=false;$('results').innerHTML=`<div class="panel-title"><h2>关联分析结果 ${demoMode?'<span class="tag warn">虚构演示数据</span>':''}</h2><div><button id="export">导出 JSON 报告</button> <button id="print">打印 / 存为 PDF</button></div></div><div class="metrics"><div class="metric"><b>${pairs.length}</b><span>组标书对比</span></div><div class="metric"><b class="risk">${scores.length?Math.max(...scores):'—'}<small style="font-size:14px"> / 100</small></b><span>最高关联线索分 · 非概率</span></div><div class="metric"><b>${evidenceCount}</b><span>条有效关联线索</span></div></div><div class="note">${demoMode?'当前为虚构数据，不涉及真实企业。 ':''}<strong>分析结果仅供参考，不作围标或违法认定。</strong> 结果仅覆盖已识别内容。${docs.some(d=>d.low||d.warning)?'存在文字不足页或图片提取限制，请先补充校正。 ':''}同一模板、公共联系人、证照和图库素材都可能造成相似。请逐条核查并排除无关证据。</div>`+pairs.map((p,pi)=>{const a=getDoc(p.a),b=getDoc(p.b),s=E.score(p);return `<article class="panel"><div class="pair-title"><div><span class="tag ${s>=30?'warn':''}">${p.duplicate?'疑似重复材料':s>=60?'优先核查':s>=30?'建议核查':'当前线索有限'}</span><h3>${esc(a.company)}<br><span style="color:#8c9b95;font-size:12px">与</span> ${esc(b.company)}</h3></div><div class="score">${s===null?'—':s}<small> / 100</small></div></div>${p.duplicate?'<p class="note">公司名称或文件内容相同，不能视为两个独立投标人。请核对企业名称或移除重复版本。</p>':''}${p.evidence.length?p.evidence.map((e,ei)=>`<div class="evidence" style="opacity:${e.active?1:.45}"><div class="evidence-head"><b>${esc(e.title)}</b><label><input type="checkbox" data-pair="${pi}" data-evidence="${ei}" ${e.active?'checked':''}> 计入分析</label></div>${e.kind==='image'?'<p>仅提示重复素材 / 近似构图，不证明同一地点或拍摄者。请比较背景、光影、物体位置与裁剪范围。</p>':''}<div class="quotes">${quote(e.a,a)}${quote(e.b,b)}</div></div>`).join(''):'<div class="no-match">在已识别内容中未发现满足当前规则的共同线索。这不排除其他关联。</div>'}<label style="font-size:13px">人工复核记录<textarea data-notes="${pi}" placeholder="记录照片中的相同背景、建筑标识、车辆、拍摄角度、光影、公共素材来源，以及核查结论…">${esc(p.notes||'')}</textarea></label></article>`}).join('');$('export').onclick=exportReport;$('print').onclick=()=>window.print()}
 $('analyze').onclick=async()=>{
+  if(busy||!await BidBilling.beforeAnalysis(demoMode))return;
   busy=true;phase='analyzing';renderDocs();status('正在计算字段、文本和图片关联…');let worker;
   try{
     const ignores=$('exclude').value.split(/[,，\n]/).map(s=>s.trim()).filter(Boolean);
-    worker=new Worker('analysis-worker.js');
     const compactDocs=docs.map(d=>({...d,images:d.images.map((im,imageIndex)=>({...im,src:undefined,imageIndex}))}));
+    const payload={docs:compactDocs,baseline:$('baseline').value,ignores};
+    if(BidBilling.live&&!demoMode){pairs=await BidBilling.analyze(payload)}else{
+    worker=new Worker('analysis-worker.js');
     pairs=await new Promise((resolve,reject)=>{
       worker.onmessage=({data})=>{if(data.type==='progress')status(data.message);else if(data.type==='done')resolve(data.pairs);else reject(Error(data.message))};
       worker.onerror=()=>reject(Error('分析进程未能完成。请减少文件或关闭其他浏览器标签后重试。'));
-      worker.postMessage({docs:compactDocs,baseline:$('baseline').value,ignores});
+      worker.postMessage(payload);
     });
+    }
     for(const pair of pairs)for(const e of pair.evidence)if(e.kind==='image'){e.a=getDoc(pair.a).images[e.a.imageIndex];e.b=getDoc(pair.b).images[e.b.imageIndex]}
     phase='results';results();renderSteps();status('分析完成，结果仅供参考。可取消勾选不适用的证据，分数会随之更新。');$('results').scrollIntoView({behavior:'smooth',block:'start'});
   }catch(error){phase='review';status('分析未完成：'+error.message)}finally{worker?.terminate();busy=false;renderDocs()}

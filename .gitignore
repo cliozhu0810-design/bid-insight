@@ -1,0 +1,8 @@
+.env
+.env.*
+!.env.example
+server/data/
+*.sqlite*
+*.pem
+*.key
+node_modules/
